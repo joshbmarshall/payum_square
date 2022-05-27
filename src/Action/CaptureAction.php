@@ -43,20 +43,46 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
         $obtainNonce->setModel($model);
 
         $this->gateway->execute($obtainNonce);
-
         if (!$model->offsetExists('status')) {
-            $stripe = new \Stripe\StripeClient($this->config['secret_key']);
-            $paymentIntent = $stripe->paymentIntents->retrieve($model['nonce'], []);
-            if ($paymentIntent->status == \Stripe\PaymentIntent::STATUS_SUCCEEDED) {
+            $model['status'] = 'success';
+            $model['transactionReference'] = 'test';
+            $model['result'] = 'result';
+
+            $client = new \Square\SquareClient([
+                'accessToken' => $this->config['access_token'],
+                'environment' => $this->config['sandbox'] ? \Square\Environment::SANDBOX : \Square\Environment::PRODUCTION,
+            ]);
+
+            $amount_money = new \Square\Models\Money();
+            $amount_money->setAmount($model['amount'] * 100);
+            $amount_money->setCurrency($model['currency']);
+
+            $body = new \Square\Models\CreatePaymentRequest(
+                $model['nonce'],
+                $request->getToken()->getHash(),
+                $amount_money
+            );
+            $body->setAutocomplete(true);
+            $body->setVerificationToken($model['verificationToken']);
+            $body->setCustomerId($model['customer_id'] ?? null);
+            $body->setLocationId($model['location_id']);
+            $body->setReferenceId($model['reference_id'] ?? null);
+            $body->setNote($model['description']);
+
+            $api_response = $client->getPaymentsApi()->createPayment($body);
+
+            if ($api_response->isSuccess()) {
+                $result = $api_response->getResult();
                 $model['status'] = 'success';
+                $model['transactionReference'] = $result->getPayment()->getId();
+                $model['result'] = $result->getPayment();
             } else {
-                // Report error
+                $errors = $api_response->getErrors();
                 $model['status'] = 'failed';
                 $model['error'] = 'failed';
-            }
-            foreach ($paymentIntent->charges as $charge) {
-                $model['transactionReference'] = $charge->id;
-                $model['result'] = $charge;
+                foreach ($errors as $error) {
+                    $model['error'] = $error->getDetail();
+                }
             }
         }
     }

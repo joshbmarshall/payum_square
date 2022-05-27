@@ -47,36 +47,60 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
 
         $getHttpRequest = new GetHttpRequest();
         $this->gateway->execute($getHttpRequest);
-        // Received payment intent information from Stripe
+        // Received payment information from Square
         if (isset($getHttpRequest->request['payment_intent'])) {
             $model['nonce'] = $getHttpRequest->request['payment_intent'];
+            $model['verificationToken'] = $getHttpRequest->request['verification_token'];
             return;
         }
-        $afterPayDetails = [];
-        if ($this->use_afterpay) { // Afterpay order
-            $afterPayDetails = [
-                'confirm' => true,
-                'payment_method_types' => ['afterpay_clearpay'],
-                'shipping' => $model['shipping'],
-                'payment_method_data' => [
-                    'type' => 'afterpay_clearpay',
-                    'billing_details' => $model['billing'],
-                ],
-                'return_url' => $uri->withPath('')->withFragment('')->withQuery('')->__toString() . $getHttpRequest->uri,
-            ];
-        }
-        $paymentIntentData = array_merge([
-            'amount' => round($model['amount'] * pow(10, $model['currencyDigits'])),
-            'payment_method_types' => $model['payment_method_types'] ?? ['card'],
-            'currency' => $model['currency'],
-            'metadata' => ['integration_check' => 'accept_a_payment'],
-            'statement_descriptor' => $model['statement_descriptor_suffix'],
-            'description' => $model['description'],
-        ], $afterPayDetails);
 
-        //$model['stripePaymentIntent'] = \Stripe\PaymentIntent::create($paymentIntentData);
+        if (false) { // TODO Afterpay
+            $afterPayDetails = [];
+            if ($this->use_afterpay) { // Afterpay order
+                $afterPayDetails = [
+                    'confirm' => true,
+                    'payment_method_types' => ['afterpay_clearpay'],
+                    'shipping' => $model['shipping'],
+                    'payment_method_data' => [
+                        'type' => 'afterpay_clearpay',
+                        'billing_details' => $model['billing'],
+                    ],
+                    'return_url' => $uri->withPath('')->withFragment('')->withQuery('')->__toString() . $getHttpRequest->uri,
+                ];
+            }
+            $paymentIntentData = array_merge([
+                'amount' => round($model['amount'] * pow(10, $model['currencyDigits'])),
+                'payment_method_types' => $model['payment_method_types'] ?? ['card'],
+                'currency' => $model['currency'],
+                'metadata' => ['integration_check' => 'accept_a_payment'],
+                'statement_descriptor' => $model['statement_descriptor_suffix'],
+                'description' => $model['description'],
+            ], $afterPayDetails);
+            /*
+                'billingContact' => [
+                    'addressLines' => ['123 Main Street', 'Apartment 1'],
+                    'familyName' => 'Doe',
+                    'givenName' => 'John',
+                    'email' => 'jondoe@gmail.com',
+                    'country' => 'GB',
+                    'phone' => '3214563987',
+                    'region' => 'LND',
+                    'city' => 'London',
+                ],
+            */
+        }
+
+        $billingContact = [
+            //'email' => $model['email'],
+        ];
         $this->gateway->execute($renderTemplate = new RenderTemplate($this->templateName, array(
             'amount' => $model['currencySymbol'] . ' ' . number_format($model['amount'], $model['currencyDigits']),
+            'verificationDetails' => json_encode([
+                'amount' => number_format($model['amount'], 2, '.', ''),
+                'billingContact' => $billingContact,
+                'currencyCode' => $model['currency'],
+                'intent' => 'CHARGE',
+            ]),
             'appId' => $model['app_id'],
             'locationId' => $model['location_id'],
             'actionUrl' => $getHttpRequest->uri,
