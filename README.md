@@ -25,15 +25,19 @@ $payum = (new PayumBuilder)
 
     ->addGateway('square', [
         'factory' => 'square',
-        'publishable_key' => 'Your Public Key',
-        'secret_key' => 'Your Private Key',
+        'access_token' => 'Your-access-token',
+        'app_id' => 'Your-app-id',
+        'location_id' => 'Your-location-id',
+        'sandbox' => false,
         'img_url' => 'https://path/to/logo/image.jpg',
     ])
 
     ->addGateway('square_afterpay', [
         'factory' => 'square_afterpay',
-        'publishable_key' => 'Your Public Key',
-        'secret_key' => 'Your Private Key',
+        'access_token' => 'Your-access-token',
+        'app_id' => 'Your-app-id',
+        'location_id' => 'Your-location-id',
+        'sandbox' => false,
         'img_url' => 'https://path/to/logo/image.jpg',
     ])
 
@@ -58,11 +62,6 @@ $payment->setNumber(uniqid());
 $payment->setCurrencyCode($currency);
 $payment->setTotalAmount(100); // Total cents
 $payment->setDescription(substr($description, 0, 45));
-$payment->setDetails([
-    'local' => [
-        'email' => $email, // Used for the customer to be able to save payment details
-    ],
-]);
 $storage->setInternalDetails($payment, $request);
 
 $captureToken = $payum->getTokenFactory()->createCaptureToken('square', $payment, 'done.php');
@@ -91,9 +90,6 @@ $payment->setCurrencyCode($currency);
 $payment->setTotalAmount(100); // Total cents
 $payment->setDescription(substr($description, 0, 45));
 $payment->setDetails([
-    'local' => [
-        'email' => $email, // Used for the customer to be able to save payment details
-    ],
     'shipping' => [
         'name' => 'Firstname Lastname',
         'address' => [
