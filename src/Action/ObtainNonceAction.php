@@ -60,7 +60,7 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
             'email' => $model['email'] ?? '',
         ];
         $this->gateway->execute($renderTemplate = new RenderTemplate($this->templateName, array(
-            'payum_token' => ($getHttpRequest->query)['payum_token'],
+            'merchant_reference' => $model['merchant_reference'] ?? '',
             'amount' => $model['currencySymbol'] . ' ' . number_format($model['amount'], $model['currencyDigits']),
             'verificationDetails' => json_encode([
                 'amount' => number_format($model['amount'], 2, '.', ''),

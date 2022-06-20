@@ -101,7 +101,7 @@
               'Content-Type': 'application/json;charset=utf-8'
             },
             body: JSON.stringify({
-              token: '{{ payum_token }}',
+              merchant_reference: '{{ merchant_reference }}',
               address: _address
             })
           })
@@ -122,13 +122,15 @@
 
         req.addEventListener('afterpay_shippingoptionchanged', function (_option) {
           {% if afterpay_shippingchange_url %}
-          let response = await fetch('{{ afterpay_shippingchange_url }}', {
           fetch('{{ afterpay_shippingchange_url }}', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json;charset=utf-8'
             },
-            body: JSON.stringify(_option)
+            body: JSON.stringify({
+              merchant_reference: '{{ merchant_reference }}',
+              option: _option
+            })
           })
           {% endif %}
         });

@@ -105,12 +105,14 @@ $payment->setDetails([
         'email' => 'pickup@email.address', // Optional
         'phone' => 'Pickup Phone', // Optional
     ],
+    // merchant_reference is sent to the below api endpoints to assist in identifying the purchase
+    'merchant_reference' => '12345',
     // Add api endpoint that gets the selected Afterpay address and returns shipping options
-    'afterpay_addresschange_url'] = 'https://mysite/afterPayAddress',
+    'afterpay_addresschange_url' => 'https://mysite/afterPayAddress',
     // Add api endpoint that records which shipping option the user chooses
-    'afterpay_shippingchange_url'] = 'https://mysite/afterPayShipping',
+    'afterpay_shippingchange_url' => 'https://mysite/afterPayShipping',
     // Use below if dynamic shipping options not used with callback
-    'afterpay_shipping_options' = [
+    'afterpay_shipping_options' => [
         [
             'amount' => '0.00',
             'id' => 'shipping-option-1',
@@ -141,7 +143,7 @@ $payment->setDetails([
                 'label' => 'total',
             ],
         ],
-    ];
+    ],
 ]);
 $storage->setInternalDetails($payment, $request);
 
