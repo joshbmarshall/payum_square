@@ -22,13 +22,15 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
      */
     protected $templateName;
     protected $use_afterpay;
+    protected $use_sandbox;
 
     /**
      * @param string $templateName
      */
-    public function __construct(string $templateName, bool $use_afterpay) {
+    public function __construct(string $templateName, bool $use_sandbox, bool $use_afterpay) {
         $this->templateName = $templateName;
         $this->use_afterpay = $use_afterpay;
+        $this->use_sandbox = $use_sandbox;
     }
 
     /**
@@ -54,46 +56,11 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
             return;
         }
 
-        if (false) { // TODO Afterpay
-            $afterPayDetails = [];
-            if ($this->use_afterpay) { // Afterpay order
-                $afterPayDetails = [
-                    'confirm' => true,
-                    'payment_method_types' => ['afterpay_clearpay'],
-                    'shipping' => $model['shipping'],
-                    'payment_method_data' => [
-                        'type' => 'afterpay_clearpay',
-                        'billing_details' => $model['billing'],
-                    ],
-                    'return_url' => $uri->withPath('')->withFragment('')->withQuery('')->__toString() . $getHttpRequest->uri,
-                ];
-            }
-            $paymentIntentData = array_merge([
-                'amount' => round($model['amount'] * pow(10, $model['currencyDigits'])),
-                'payment_method_types' => $model['payment_method_types'] ?? ['card'],
-                'currency' => $model['currency'],
-                'metadata' => ['integration_check' => 'accept_a_payment'],
-                'statement_descriptor' => $model['statement_descriptor_suffix'],
-                'description' => $model['description'],
-            ], $afterPayDetails);
-            /*
-                'billingContact' => [
-                    'addressLines' => ['123 Main Street', 'Apartment 1'],
-                    'familyName' => 'Doe',
-                    'givenName' => 'John',
-                    'email' => 'jondoe@gmail.com',
-                    'country' => 'GB',
-                    'phone' => '3214563987',
-                    'region' => 'LND',
-                    'city' => 'London',
-                ],
-            */
-        }
-
         $billingContact = [
-            //'email' => $model['email'],
+            'email' => $model['email'] ?? '',
         ];
         $this->gateway->execute($renderTemplate = new RenderTemplate($this->templateName, array(
+            'payum_token' => ($getHttpRequest->query)['payum_token'],
             'amount' => $model['currencySymbol'] . ' ' . number_format($model['amount'], $model['currencyDigits']),
             'verificationDetails' => json_encode([
                 'amount' => number_format($model['amount'], 2, '.', ''),
@@ -101,12 +68,22 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
                 'currencyCode' => $model['currency'],
                 'intent' => 'CHARGE',
             ]),
+            'numeric_amount' => $model['amount'],
+            'currencyCode' => $model['currency'],
             'appId' => $model['app_id'],
             'locationId' => $model['location_id'],
             'actionUrl' => $getHttpRequest->uri,
             'imgUrl' => $model['img_url'],
-            'use_afterpay' => $this->use_afterpay ? "true" : "false",
+            'use_afterpay' => $this->use_afterpay ? 1 : 0,
             'billing' => $model['billing'] ?? [],
+            'shipping' => $model['shipping'] ?? [],
+            'country' => $model['country'] ?? 'AU',
+            'use_sandbox' => $this->use_sandbox ? 1 : 0,
+            'ship_item' => $model['ship_item'] ?? false,
+            'pickupContact' => json_encode($model['pickup_contact'] ?? null),
+            'afterpay_addresschange_url' => $model['afterpay_addresschange_url'] ?? false,
+            'afterpay_shippingchange_url' => $model['afterpay_shippingchange_url'] ?? false,
+            'afterpay_shipping_options' => json_encode($model['afterpay_shipping_options'] ?? []),
         )));
 
         throw new HttpResponse($renderTemplate->getResult());

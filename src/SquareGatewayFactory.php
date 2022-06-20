@@ -15,8 +15,8 @@ class SquareGatewayFactory extends GatewayFactory {
      */
     protected function populateConfig(ArrayObject $config) {
         $config->defaults([
-            'payum.factory_name' => 'stripe_elements',
-            'payum.factory_title' => 'stripe_elements',
+            'payum.factory_name' => 'square',
+            'payum.factory_title' => 'square',
 
             'payum.template.obtain_nonce' => "@PayumSquare/Action/obtain_nonce.html.twig",
 
@@ -26,7 +26,7 @@ class SquareGatewayFactory extends GatewayFactory {
             'payum.action.status' => new StatusAction(),
             'payum.action.convert_payment' => new ConvertPaymentAction(),
             'payum.action.obtain_nonce' => function (ArrayObject $config) {
-                return new ObtainNonceAction($config['payum.template.obtain_nonce'], $config['type'] == 'stripe_afterpay');
+                return new ObtainNonceAction($config['payum.template.obtain_nonce'], $config['sandbox'], $config['type'] == 'square_afterpay');
             },
         ]);
 
@@ -43,7 +43,7 @@ class SquareGatewayFactory extends GatewayFactory {
                 return new Api((array) $config, $config['payum.http_client'], $config['httplug.message_factory']);
             };
         }
-        $config['use_afterpay'] = $config['type'] == 'stripe_afterpay';
+        $config['use_afterpay'] = $config['type'] == 'square_afterpay';
         $payumPaths = $config['payum.paths'];
         $payumPaths['PayumSquare'] = __DIR__ . '/Resources/views';
         $config['payum.paths'] = $payumPaths;

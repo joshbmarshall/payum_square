@@ -12,8 +12,9 @@
     {% if imgUrl %}
 			<img style="max-width: 100%; height: auto;" src="{{ imgUrl }}" />
     {% endif %}
+      <div id="afterpay-button"></div>
       <div id="card-container"></div>
-      <button id="card-button" type="button">Pay {{ amount }}</button>
+      <button id="card-button" type="button" style="visibility: hidden;">Pay {{ amount }}</button>
       <center style="margin-top: 10px;">
       <small>
       Powered by
@@ -47,12 +48,15 @@
   {% block square_init_js %}
     <script
       type="text/javascript"
+      {% if use_sandbox %}
       src="https://sandbox.web.squarecdn.com/v1/square.js"
+      {% else %}
+      src="https://web.squarecdn.com/v1/square.js"
+      {% endif %}
     ></script>
     <script>
       const appId = "{{ appId }}"
       const locationId = "{{ locationId }}"
-
       async function initializeCard(payments) {
         const card = await payments.card();
         await card.attach('#card-container');
@@ -74,6 +78,71 @@
 
           throw new Error(errorMessage);
         }
+      }
+
+      function buildPaymentRequest(payments) {
+        const req = payments.paymentRequest({
+          countryCode: '{{ country }}',
+          currencyCode: '{{ currencyCode }}',
+          total: {
+            amount: "{{ numeric_amount }}",
+            label: 'Total',
+          },
+          requestShippingContact: {{ ship_item ? 'true' : 'false' }},
+          pickupContact: {{ pickupContact|raw }},
+        });
+
+        // Note how afterpay has its own listeners
+        req.addEventListener('afterpay_shippingaddresschanged', async function (_address) {
+          {% if afterpay_addresschange_url %}
+          let response = await fetch('{{ afterpay_addresschange_url }}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json;charset=utf-8'
+            },
+            body: JSON.stringify({
+              token: '{{ payum_token }}',
+              address: _address
+            })
+          })
+          if (response.ok) {
+            let json = await response.json()
+            return {
+              shippingOptions: json
+            }
+          } else {
+            alert("Could not get shipping options " + response.status)
+          }
+          {% else %}
+          return {
+            shippingOptions: {{ afterpay_shipping_options|raw }}
+          }
+          {% endif %}
+        });
+
+        req.addEventListener('afterpay_shippingoptionchanged', function (_option) {
+          {% if afterpay_shippingchange_url %}
+          let response = await fetch('{{ afterpay_shippingchange_url }}', {
+          fetch('{{ afterpay_shippingchange_url }}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json;charset=utf-8'
+            },
+            body: JSON.stringify(_option)
+          })
+          {% endif %}
+        });
+
+        return req;
+      }
+
+      async function initializeAfterpay(payments) {
+        const paymentRequest = buildPaymentRequest(payments)
+
+        const afterpay = await payments.afterpayClearpay(paymentRequest);
+        await afterpay.attach('#afterpay-button');
+
+        return afterpay;
       }
 
       // status is either SUCCESS or FAILURE;
@@ -109,6 +178,15 @@
           return;
         }
 
+        let afterpay;
+        try {
+{% if use_afterpay %}
+          afterpay = await initializeAfterpay(payments);
+{% endif %}
+        } catch (e) {
+          console.error('Initializing Afterpay/Clearpay failed', e);
+        }
+
         let card;
         try {
           card = await initializeCard(payments);
@@ -116,6 +194,9 @@
           console.error('Initializing Card failed', e);
           return;
         }
+
+        // Show Pay button
+        document.getElementById('card-button').style.visibility = 'visible'
 
         async function verifyBuyer(payments, token) {
           const verificationDetails = {{ verificationDetails|raw }}
@@ -127,6 +208,14 @@
         }
 
         // Checkpoint 2.
+
+        if (afterpay !== undefined) {
+          const afterpayButton = document.getElementById('afterpay-button');
+          afterpayButton.addEventListener('click', async function (event) {
+            await handlePaymentMethodSubmission(event, afterpay);
+          });
+        }
+
         async function handlePaymentMethodSubmission(event, paymentMethod, shouldVerify = false) {
           event.preventDefault();
 
@@ -222,6 +311,10 @@ button:hover {
 button:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+#afterpay-button button {
+  margin-bottom:10px;
 }
 
 @media only screen and (max-width: 600px) {
