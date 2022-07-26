@@ -62,6 +62,40 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
                 $request->getToken()->getHash(),
                 $amount_money
             );
+
+            $line_item = $model['square_item_name'] ?? false;
+
+            if ($line_item) {
+                // Add Order
+                $order = new \Square\Models\Order($model['location_id']);
+                $order_line_item = new \Square\Models\OrderLineItem('1');
+                $order_line_item->setName($line_item);
+                $order_line_item->setBasePriceMoney($amount_money);
+                $order->setLineItems([$order_line_item]);
+
+                $orderbody = new \Square\Models\CreateOrderRequest();
+                $orderbody->setOrder($order);
+                $orderbody->setIdempotencyKey(uniqid());
+                $order_api_response = $client->getOrdersApi()->createOrder($orderbody);
+
+                if ($order_api_response->isSuccess()) {
+                    $result = $order_api_response->getResult();
+                    $order_id = $result->getOrder()->getId();
+                } else {
+                    $order_id = false;
+                    $errors = $order_api_response->getErrors();
+                    $model['status'] = 'failed';
+                    $model['error'] = 'failed';
+                    foreach ($errors as $error) {
+                        $model['error'] = $error->getDetail();
+                    }
+                }
+
+                if ($order_id) {
+                    $body->setOrderId($order_id);
+                }
+            }
+
             $body->setAutocomplete(true);
             $body->setVerificationToken($model['verificationToken']);
             $body->setCustomerId($model['customer_id'] ?? null);
