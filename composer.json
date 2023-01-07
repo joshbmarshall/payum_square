@@ -23,15 +23,9 @@
             "homepage": "https://github.com/joshbmarshall/payum_square/contributors"
         }
     ],
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/joshbmarshall/square-php-sdk"
-        }
-    ],
     "require": {
         "payum/core": "^1.5",
-		"square/square": "dev-master"
+		"square/square": "19.0.1.20220512"
     },
     "require-dev": {
         "payum/core": "^1.5",
