@@ -60,8 +60,8 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
             $body = new \Square\Models\CreatePaymentRequest(
                 $model['nonce'],
                 $request->getToken()->getHash(),
-                $amount_money
             );
+            $body->setAmountMoney($amount_money);
 
             $line_item = $model['square_item_name'] ?? false;
 
