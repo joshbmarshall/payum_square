@@ -25,7 +25,7 @@
     ],
     "require": {
         "payum/core": "^1.5",
-		"square/square": "19.0.1.20220512"
+        "square/square": "^26.0"
     },
     "require-dev": {
         "payum/core": "^1.5",
