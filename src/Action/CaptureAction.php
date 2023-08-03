@@ -22,7 +22,67 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
         $this->config = $config;
     }
 
+    public function getSquareCustomer(\Square\SquareClient $client, array $data): string {
+        // Search for customer
+        $email = new \Square\Models\CustomerTextFilter();
+        $email->setExact($data['email']);
+
+        $filter = new \Square\Models\CustomerFilter();
+        $filter->setEmailAddress($email);
+        $query = new \Square\Models\CustomerQuery();
+        $query->setFilter($filter);
+
+        $body = new \Square\Models\SearchCustomersRequest();
+        $body->setLimit(1);
+        $body->setQuery($query);
+
+        $api_response = $client->getCustomersApi()->searchCustomers($body);
+
+        if ($api_response->isSuccess()) {
+            $customers = $api_response->getResult()->getCustomers();
+            if ($customers) {
+                foreach ($customers as $customer) {
+                    return $customer->getId();
+                }
+            }
+        }
+
+        // Create the customer
+
+        $body = new \Square\Models\CreateCustomerRequest();
+        if (isset($data['given_name'])) {
+            $body->setGivenName($data['given_name']);
+        }
+        if (isset($data['family_name'])) {
+            $body->setFamilyName($data['family_name']);
+        }
+        if (isset($data['email'])) {
+            $body->setEmailAddress($data['email']);
+        }
+        if (isset($data['phone'])) {
+            $body->setPhoneNumber($data['phone']);
+        }
+        if (isset($data['id'])) {
+            $body->setReferenceId($data['id']);
+        }
+        if (isset($data['note'])) {
+            $body->setNote($data['note']);
+        }
+
+        $api_response = $client->getCustomersApi()->createCustomer($body);
+
+        if ($api_response->isSuccess()) {
+            $result = $api_response->getResult();
+        } else {
+            foreach ($api_response->getErrors() as $error) {
+                throw new \Exception($error->getDetail());
+            }
+        }
+        return $result->getCustomer()->getId();
+    }
+
     public function getSquareCatalogueObject(\Square\SquareClient $client, string $name): string {
+        // Search for catalogue item
         $query = new \Square\Models\CatalogQuery();
         $query->setExactQuery(new \Square\Models\CatalogQueryExact('name', $name));
 
@@ -147,6 +207,9 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
                 }
                 $order->setLineItems($order_line_items);
 
+                if (isset($model['customer'])) {
+                    $order->setCustomerId($this->getSquareCustomer($client, $model['customer']));
+                }
                 $orderbody = new \Square\Models\CreateOrderRequest();
                 $orderbody->setOrder($order);
                 $orderbody->setIdempotencyKey(uniqid());
