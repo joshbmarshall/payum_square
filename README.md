@@ -63,6 +63,24 @@ $payment->setCurrencyCode($currency);
 $payment->setTotalAmount(100); // Total cents
 $payment->setDescription(substr($description, 0, 45));
 $storage->setInternalDetails($payment, $request);
+$payment->setDetails([
+    'square_item_name' => 'Payment name', // Optional, sets the line item to this product
+    'square_line_items' => [ // Optional, sets the line items, and creates catalogue items
+        [
+            'name' => 'Product Name',
+            'qty' => 2,
+            'amount' => 50,
+            'note' => 'Optional Note',
+        ],
+        // ...
+    ],
+    'square_customer' => [ // Optional, sets this order to this customer
+        'email' => 'xx@xx.com', // Required
+        'given_name' => 'Customer First Name', // Optional
+        'family_name' => 'Customer Last Name', // Optional
+        'id' => 'My internal id', // Optional
+    ],
+]);
 
 $captureToken = $payum->getTokenFactory()->createCaptureToken('square', $payment, 'done.php');
 $url = $captureToken->getTargetUrl();
