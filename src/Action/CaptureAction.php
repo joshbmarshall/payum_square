@@ -94,11 +94,14 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
 
         $api_response = $client->getCatalogApi()->searchCatalogObjects($body);
 
-        if (!$api_response->isSuccess()) {
+        if ($api_response->isSuccess()) {
             $result = $api_response->getResult();
-            foreach ($result->getObjects() as $object) {
-                foreach ($object->getItemData()->getVariations() as $variation) {
-                    return $variation->getId();
+            $objects = $result->getObjects();
+            if ($objects) {
+                foreach ($objects as $object) {
+                    foreach ($object->getItemData()->getVariations() as $variation) {
+                        return $variation->getId();
+                    }
                 }
             }
         }
