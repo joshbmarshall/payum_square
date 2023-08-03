@@ -22,6 +22,59 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
         $this->config = $config;
     }
 
+    public function getSquareCatalogueObject(\Square\SquareClient $client, string $name): string {
+        $query = new \Square\Models\CatalogQuery();
+        $query->setExactQuery(new \Square\Models\CatalogQueryExact('name', $name));
+
+
+        $body = new \Square\Models\SearchCatalogObjectsRequest();
+        $body->setObjectTypes(['ITEM']);
+        $body->setQuery($query);
+        $body->setLimit(1);
+
+        $api_response = $client->getCatalogApi()->searchCatalogObjects($body);
+
+        if (!$api_response->isSuccess()) {
+            $result = $api_response->getResult();
+            foreach ($result->getObjects() as $object) {
+                foreach ($object->getItemData()->getVariations() as $variation) {
+                    return $variation->getId();
+                }
+            }
+        }
+
+        // Create the catalogue item
+        $item_variation_data = new \Square\Models\CatalogItemVariation();
+        $item_variation_data->setItemId('#new');
+        $item_variation_data->setName('-');
+        $item_variation_data->setPricingType('VARIABLE_PRICING');
+
+        $catalog_object = new \Square\Models\CatalogObject('ITEM_VARIATION', '#newvariation');
+        $catalog_object->setItemVariationData($item_variation_data);
+
+        $item_data = new \Square\Models\CatalogItem();
+        $item_data->setName($name);
+        $item_data->setVariations([$catalog_object]);
+
+        $object = new \Square\Models\CatalogObject('ITEM', '#new');
+        $object->setItemData($item_data);
+
+        $body = new \Square\Models\UpsertCatalogObjectRequest(uniqid(), $object);
+
+        $api_response = $client->getCatalogApi()->upsertCatalogObject($body);
+
+        if ($api_response->isSuccess()) {
+            $result = $api_response->getResult();
+        } else {
+            foreach ($api_response->getErrors() as $error) {
+                throw new \Exception($error->getDetail());
+            }
+        }
+        foreach ($result->getCatalogObject()->getItemData()->getVariations() as $variation) {
+            return $variation->getId();
+        }
+    }
+
     /**
      * {@inheritDoc}
      *
@@ -63,15 +116,36 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
             );
             $body->setAmountMoney($amount_money);
 
-            $line_item = $model['square_item_name'] ?? false;
+            $item_name = $model['square_item_name'] ?? false;
+            $line_items = $model['square_line_items'] ?? [];
 
-            if ($line_item) {
+            if ($item_name) {
+                $line_items[] = [
+                    'name' => $item_name,
+                    'qty' => 1,
+                    'amount' => $model['amount'],
+                ];
+            }
+
+            if ($line_items) {
                 // Add Order
                 $order = new \Square\Models\Order($model['location_id']);
-                $order_line_item = new \Square\Models\OrderLineItem('1');
-                $order_line_item->setName($line_item);
-                $order_line_item->setBasePriceMoney($amount_money);
-                $order->setLineItems([$order_line_item]);
+                $order_line_items = [];
+                foreach ($line_items as $line_item) {
+                    $order_line_item = new \Square\Models\OrderLineItem($line_item['qty']);
+                    $order_line_item->setCatalogObjectId($this->getSquareCatalogueObject($client, $line_item['name']));
+
+                    $line_amount_money = new \Square\Models\Money();
+                    $line_amount_money->setAmount($line_item['amount'] * 100);
+                    $line_amount_money->setCurrency($model['currency']);
+                    $order_line_item->setBasePriceMoney($line_amount_money);
+                    if ($line_item['note'] ?? '') {
+                        $order_line_item->setNote($line_item['note']);
+                    }
+
+                    $order_line_items[] = $order_line_item;
+                }
+                $order->setLineItems($order_line_items);
 
                 $orderbody = new \Square\Models\CreateOrderRequest();
                 $orderbody->setOrder($order);
