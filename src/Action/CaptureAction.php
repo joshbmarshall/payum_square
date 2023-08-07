@@ -170,7 +170,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
             ]);
 
             $amount_money = new \Square\Models\Money();
-            $amount_money->setAmount($model['amount'] * 100);
+            $amount_money->setAmount(round($model['amount'] * 100));
             $amount_money->setCurrency($model['currency']);
 
             $body = new \Square\Models\CreatePaymentRequest(
@@ -199,7 +199,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
                     $order_line_item->setCatalogObjectId($this->getSquareCatalogueObject($client, $line_item['name']));
 
                     $line_amount_money = new \Square\Models\Money();
-                    $line_amount_money->setAmount($line_item['amount'] * 100);
+                    $line_amount_money->setAmount(round($line_item['amount'] * 100));
                     $line_amount_money->setCurrency($model['currency']);
                     $order_line_item->setBasePriceMoney($line_amount_money);
                     if ($line_item['note'] ?? '') {
