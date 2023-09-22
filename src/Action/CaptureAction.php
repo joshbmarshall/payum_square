@@ -181,6 +181,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
 
             $item_name = $model['square_item_name'] ?? false;
             $line_items = $model['square_line_items'] ?? [];
+            $order_discount = $model['square_discount'] ?? 0;
 
             if ($item_name) {
                 $line_items[] = [
@@ -213,6 +214,19 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
                 if (isset($model['customer'])) {
                     $order->setCustomerId($this->getSquareCustomer($client, $model['customer']));
                 }
+
+                if ($order_discount) {
+                    $discount_amount_money = new \Square\Models\Money();
+                    $discount_amount_money->setAmount(round($order_discount * 100));
+                    $discount_amount_money->setCurrency($model['currency']);
+                    $order_line_item_discount = new \Square\Models\OrderLineItemDiscount();
+                    $order_line_item_discount->setUid('discount');
+                    $order_line_item_discount->setName('Discount');
+                    $order_line_item_discount->setAmountMoney($discount_amount_money);
+                    $order_line_item_discount->setScope('ORDER');
+                    $order->setDiscounts([$order_line_item_discount]);
+                }
+
                 $orderbody = new \Square\Models\CreateOrderRequest();
                 $orderbody->setOrder($order);
                 $orderbody->setIdempotencyKey(uniqid());

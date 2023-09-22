@@ -74,6 +74,7 @@ $payment->setDetails([
         ],
         // ...
     ],
+    'square_discount' => 0, // Optional, sets the whole order discount where the total of the line items does not match the total amount above
     'square_customer' => [ // Optional, sets this order to this customer
         'email' => 'xx@xx.com', // Required
         'given_name' => 'Customer First Name', // Optional
