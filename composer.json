@@ -25,7 +25,7 @@
     ],
     "require": {
         "payum/core": "^1.5",
-        "square/square": "^26.0"
+        "square/square": "^30.0"
     },
     "require-dev": {
         "payum/core": "^1.5",
