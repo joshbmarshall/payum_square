@@ -88,59 +88,57 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
 
     public function getSquareCatalogueObject(\Square\SquareClient $client, string $name): string
     {
-        throw new \Exception('TODO'); // TODO
         // Search for catalogue item
-        $query = new \Square\Models\CatalogQuery();
-        $query->setExactQuery(new \Square\Models\CatalogQueryExact('name', $name));
+        $result = $client->catalog->search(
+            new \Square\Catalog\Requests\SearchCatalogObjectsRequest([
+                'objectTypes' => [
+                    \Square\Types\CatalogObjectType::Item->value,
+                ],
+                'query' => new \Square\Types\CatalogQuery([
+                    'exactQuery' => new \Square\Types\CatalogQueryExact([
+                        'attributeName'  => 'name',
+                        'attributeValue' => $name,
+                    ]),
+                ]),
+                'limit' => 1,
+            ]),
+        );
 
-        $body = new \Square\Models\SearchCatalogObjectsRequest();
-        $body->setObjectTypes(['ITEM']);
-        $body->setQuery($query);
-        $body->setLimit(1);
-
-        $api_response = $client->getCatalogApi()->searchCatalogObjects($body);
-
-        if ($api_response->isSuccess()) {
-            $result  = $api_response->getResult();
-            $objects = $result->getObjects();
-            if ($objects) {
-                foreach ($objects as $object) {
-                    foreach ($object->getItemData()->getVariations() as $variation) {
-                        return $variation->getId();
-                    }
+        $objects = $result->getObjects();
+        if ($objects) {
+            foreach ($objects as $object) {
+                foreach ($object->asItem()->getItemData()->getVariations() as $variation) {
+                    return $variation->getValue()->getId();
                 }
             }
         }
 
         // Create the catalogue item
-        $item_variation_data = new \Square\Models\CatalogItemVariation();
-        $item_variation_data->setItemId('#new');
-        $item_variation_data->setName('-');
-        $item_variation_data->setPricingType('VARIABLE_PRICING');
+        $idempotency = uniqid();
+        $item        = $client->catalog->object->upsert(
+            new \Square\Catalog\Object\Requests\UpsertCatalogObjectRequest([
+                'idempotencyKey' => $idempotency,
+                'object'         => \Square\Types\CatalogObject::item(new \Square\Types\CatalogObjectItem([
+                    'id'       => '#new',
+                    'itemData' => new \Square\Types\CatalogItem([
+                        'name'       => $name,
+                        'variations' => [
+                            \Square\Types\CatalogObject::itemVariation(new \Square\Types\CatalogObjectItemVariation([
+                                'id'                => '#newVar',
+                                'itemVariationData' => new \Square\Types\CatalogItemVariation([
+                                    'itemId'      => '#new',
+                                    'name'        => '-',
+                                    'pricingType' => \Square\Types\CatalogPricingType::VariablePricing->value,
+                                ]),
+                            ])),
+                        ],
+                    ]),
+                ])),
+            ])
+        );
 
-        $catalog_object = new \Square\Models\CatalogObject('ITEM_VARIATION', '#newvariation');
-        $catalog_object->setItemVariationData($item_variation_data);
-
-        $item_data = new \Square\Models\CatalogItem();
-        $item_data->setName($name);
-        $item_data->setVariations([$catalog_object]);
-
-        $object = new \Square\Models\CatalogObject('ITEM', '#new');
-        $object->setItemData($item_data);
-
-        $body = new \Square\Models\UpsertCatalogObjectRequest(uniqid(), $object);
-
-        $api_response = $client->getCatalogApi()->upsertCatalogObject($body);
-
-        if ($api_response->isSuccess()) {
-            $result = $api_response->getResult();
-        } else {
-            foreach ($api_response->getErrors() as $error) {
-                throw new \Exception($error->getDetail());
-            }
-        }
-        foreach ($result->getCatalogObject()->getItemData()->getVariations() as $variation) {
-            return $variation->getId();
+        foreach ($item->getCatalogObject()->asItem()->getItemData()->getVariations() as $variation) {
+            return $variation->getValue()->getId();
         }
     }
 
@@ -231,6 +229,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                 }
 
                 if ($order_discount) {
+                    throw new \Exception('TODO'); // TODO
                     $discount_amount_money = new \Square\Models\Money();
                     $discount_amount_money->setAmount(round($order_discount * 100));
                     $discount_amount_money->setCurrency($model['currency']);
