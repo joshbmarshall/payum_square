@@ -272,19 +272,16 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
             $body->setReferenceId($model['reference_id'] ?? null);
             $body->setNote($model['description']);
 
-            $api_response = $client->payments->create($body);
-
-            throw new \Exception('TODO'); // TODO
-            if ($api_response->isSuccess()) {
-                $result                        = $api_response->getResult();
+            try {
+                $api_response                  = $client->payments->create($body);
+                $resultPayment                 = $api_response->getPayment();
                 $model['status']               = 'success';
-                $model['transactionReference'] = $result->getPayment()->getId();
-                $model['result']               = $result->getPayment();
-            } else {
-                $errors          = $api_response->getErrors();
+                $model['transactionReference'] = $resultPayment->getId();
+                $model['result']               = $resultPayment;
+            } catch (\Square\Exceptions\SquareApiException $e) {
                 $model['status'] = 'failed';
                 $model['error']  = 'failed';
-                foreach ($errors as $error) {
+                foreach ($e->getErrors() as $error) {
                     $model['error'] = $error->getDetail();
                 }
             }
