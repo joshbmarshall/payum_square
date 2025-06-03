@@ -10,7 +10,8 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Capture;
 use Cognito\PayumSquare\Request\Api\ObtainNonce;
 
-class CaptureAction implements ActionInterface, GatewayAwareInterface {
+class CaptureAction implements ActionInterface, GatewayAwareInterface
+{
     use GatewayAwareTrait;
 
     private $config;
@@ -18,28 +19,30 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
     /**
      * @param string $templateName
      */
-    public function __construct(ArrayObject $config) {
+    public function __construct(ArrayObject $config)
+    {
         $this->config = $config;
     }
 
-    public function getSquareCustomer(\Square\SquareClient $client, array $data): string {
+    public function getSquareCustomer(\Square\SquareClient $client, array $data): string
+    {
         // Search for customer
-        $email = new \Square\Models\CustomerTextFilter();
+        $email = new \Square\Types\CustomerTextFilter();
         $email->setExact($data['email']);
 
-        $filter = new \Square\Models\CustomerFilter();
+        $filter = new \Square\Types\CustomerFilter();
         $filter->setEmailAddress($email);
-        $query = new \Square\Models\CustomerQuery();
+        $query = new \Square\Types\CustomerQuery();
         $query->setFilter($filter);
 
-        $body = new \Square\Models\SearchCustomersRequest();
+        $body = new \Square\Customers\Requests\SearchCustomersRequest();
         $body->setLimit(1);
         $body->setQuery($query);
 
-        $api_response = $client->getCustomersApi()->searchCustomers($body);
+        $api_response = $client->customers->search($body);
 
-        if ($api_response->isSuccess()) {
-            $customers = $api_response->getResult()->getCustomers();
+        if ($api_response->getCustomers()) {
+            $customers = $api_response->getCustomers();
             if ($customers) {
                 foreach ($customers as $customer) {
                     return $customer->getId();
@@ -48,8 +51,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
         }
 
         // Create the customer
-
-        $body = new \Square\Models\CreateCustomerRequest();
+        $body = new \Square\Customers\Requests\CreateCustomerRequest();
         if (isset($data['given_name'])) {
             $body->setGivenName($data['given_name']);
         }
@@ -69,73 +71,75 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
             $body->setNote($data['note']);
         }
 
-        $api_response = $client->getCustomersApi()->createCustomer($body);
-
-        if ($api_response->isSuccess()) {
-            $result = $api_response->getResult();
-        } else {
-            foreach ($api_response->getErrors() as $error) {
-                throw new \Exception($error->getDetail());
+        try {
+            return $client->customers->create($body)->getCustomer()->getId();
+        } catch (\Square\Exceptions\SquareApiException $e) {
+            $model['status'] = 'failed';
+            $model['error']  = 'failed';
+            foreach ($e->getErrors() as $error) {
+                $model['error'] = $error->getDetail();
             }
         }
-        return $result->getCustomer()->getId();
+
+        return '';
     }
 
-    public function getSquareCatalogueObject(\Square\SquareClient $client, string $name): string {
+    public function getSquareCatalogueObject(\Square\SquareClient $client, string $name): string
+    {
         // Search for catalogue item
-        $query = new \Square\Models\CatalogQuery();
-        $query->setExactQuery(new \Square\Models\CatalogQueryExact('name', $name));
+        $result = $client->catalog->search(
+            new \Square\Catalog\Requests\SearchCatalogObjectsRequest([
+                'objectTypes' => [
+                    \Square\Types\CatalogObjectType::Item->value,
+                ],
+                'query' => new \Square\Types\CatalogQuery([
+                    'exactQuery' => new \Square\Types\CatalogQueryExact([
+                        'attributeName'  => 'name',
+                        'attributeValue' => $name,
+                    ]),
+                ]),
+                'limit' => 1,
+            ]),
+        );
 
-
-        $body = new \Square\Models\SearchCatalogObjectsRequest();
-        $body->setObjectTypes(['ITEM']);
-        $body->setQuery($query);
-        $body->setLimit(1);
-
-        $api_response = $client->getCatalogApi()->searchCatalogObjects($body);
-
-        if ($api_response->isSuccess()) {
-            $result = $api_response->getResult();
-            $objects = $result->getObjects();
-            if ($objects) {
-                foreach ($objects as $object) {
-                    foreach ($object->getItemData()->getVariations() as $variation) {
-                        return $variation->getId();
-                    }
+        $objects = $result->getObjects();
+        if ($objects) {
+            foreach ($objects as $object) {
+                foreach ($object->asItem()->getItemData()->getVariations() as $variation) {
+                    return $variation->getValue()->getId();
                 }
             }
         }
 
         // Create the catalogue item
-        $item_variation_data = new \Square\Models\CatalogItemVariation();
-        $item_variation_data->setItemId('#new');
-        $item_variation_data->setName('-');
-        $item_variation_data->setPricingType('VARIABLE_PRICING');
+        $idempotency = uniqid();
+        $item        = $client->catalog->object->upsert(
+            new \Square\Catalog\Object\Requests\UpsertCatalogObjectRequest([
+                'idempotencyKey' => $idempotency,
+                'object'         => \Square\Types\CatalogObject::item(new \Square\Types\CatalogObjectItem([
+                    'id'       => '#new',
+                    'itemData' => new \Square\Types\CatalogItem([
+                        'name'       => $name,
+                        'variations' => [
+                            \Square\Types\CatalogObject::itemVariation(new \Square\Types\CatalogObjectItemVariation([
+                                'id'                => '#newVar',
+                                'itemVariationData' => new \Square\Types\CatalogItemVariation([
+                                    'itemId'      => '#new',
+                                    'name'        => '-',
+                                    'pricingType' => \Square\Types\CatalogPricingType::VariablePricing->value,
+                                ]),
+                            ])),
+                        ],
+                    ]),
+                ])),
+            ])
+        );
 
-        $catalog_object = new \Square\Models\CatalogObject('ITEM_VARIATION', '#newvariation');
-        $catalog_object->setItemVariationData($item_variation_data);
-
-        $item_data = new \Square\Models\CatalogItem();
-        $item_data->setName($name);
-        $item_data->setVariations([$catalog_object]);
-
-        $object = new \Square\Models\CatalogObject('ITEM', '#new');
-        $object->setItemData($item_data);
-
-        $body = new \Square\Models\UpsertCatalogObjectRequest(uniqid(), $object);
-
-        $api_response = $client->getCatalogApi()->upsertCatalogObject($body);
-
-        if ($api_response->isSuccess()) {
-            $result = $api_response->getResult();
-        } else {
-            foreach ($api_response->getErrors() as $error) {
-                throw new \Exception($error->getDetail());
-            }
+        foreach ($item->getCatalogObject()->asItem()->getItemData()->getVariations() as $variation) {
+            return $variation->getValue()->getId();
         }
-        foreach ($result->getCatalogObject()->getItemData()->getVariations() as $variation) {
-            return $variation->getId();
-        }
+
+        return '';
     }
 
     /**
@@ -143,7 +147,8 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
      *
      * @param Capture $request
      */
-    public function execute($request) {
+    public function execute($request)
+    {
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
@@ -151,55 +156,61 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
             return;
         }
 
-        $model['app_id'] = $this->config['app_id'];
+        $model['app_id']      = $this->config['app_id'];
         $model['location_id'] = $this->config['location_id'];
-        $model['img_url'] = $this->config['img_url'] ?? '';
+        $model['img_url']     = $this->config['img_url'] ?? '';
 
         $obtainNonce = new ObtainNonce($request->getModel());
         $obtainNonce->setModel($model);
 
         $this->gateway->execute($obtainNonce);
         if (!$model->offsetExists('status')) {
-            $model['status'] = 'success';
+            $model['status']               = 'success';
             $model['transactionReference'] = 'test';
-            $model['result'] = 'result';
+            $model['result']               = 'result';
 
-            $client = new \Square\SquareClient([
-                'accessToken' => $this->config['access_token'],
-                'environment' => $this->config['sandbox'] ? \Square\Environment::SANDBOX : \Square\Environment::PRODUCTION,
-            ]);
+            $client = new \Square\SquareClient(
+                token: $this->config['access_token'],
+                options: [
+                    'baseUrl' => $this->config['sandbox'] ? \Square\Environments::Sandbox->value : \Square\Environments::Production->value,
+                ]
+            );
 
-            $amount_money = new \Square\Models\Money();
+            $amount_money = new \Square\Types\Money();
             $amount_money->setAmount(round($model['amount'] * 100));
             $amount_money->setCurrency($model['currency']);
 
-            $body = new \Square\Models\CreatePaymentRequest(
-                $model['nonce'],
-                $request->getToken()->getHash(),
-            );
+            $body = new \Square\Payments\Requests\CreatePaymentRequest([
+                'sourceId'       => $model['nonce'],
+                'idempotencyKey' => $request->getToken()->getHash(),
+            ]);
             $body->setAmountMoney($amount_money);
 
-            $item_name = $model['square_item_name'] ?? false;
-            $line_items = $model['square_line_items'] ?? [];
-            $order_discount = $model['square_discount'] ?? 0;
+            $item_name      = $model['square_item_name']  ?? false;
+            $line_items     = $model['square_line_items'] ?? [];
+            $order_discount = $model['square_discount']   ?? 0;
 
             if ($item_name) {
                 $line_items[] = [
-                    'name' => $item_name,
-                    'qty' => 1,
+                    'name'   => $item_name,
+                    'qty'    => 1,
                     'amount' => $model['amount'],
                 ];
             }
 
             if ($line_items) {
                 // Add Order
-                $order = new \Square\Models\Order($model['location_id']);
+                $order = new \Square\Types\Order([
+                    'locationId' => $model['location_id'],
+                ]);
                 $order_line_items = [];
                 foreach ($line_items as $line_item) {
-                    $order_line_item = new \Square\Models\OrderLineItem($line_item['qty']);
+                    $order_line_item = new \Square\Types\OrderLineItem([
+                        'quantity' => $line_item['qty'],
+                    ]);
                     $order_line_item->setCatalogObjectId($this->getSquareCatalogueObject($client, $line_item['name']));
 
-                    $line_amount_money = new \Square\Models\Money();
+                    $line_amount_money = new \Square\Types\Money();
                     $line_amount_money->setAmount(round($line_item['amount'] * 100));
                     $line_amount_money->setCurrency($model['currency']);
                     $order_line_item->setBasePriceMoney($line_amount_money);
@@ -216,10 +227,10 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
                 }
 
                 if ($order_discount) {
-                    $discount_amount_money = new \Square\Models\Money();
+                    $discount_amount_money = new \Square\Types\Money();
                     $discount_amount_money->setAmount(round($order_discount * 100));
                     $discount_amount_money->setCurrency($model['currency']);
-                    $order_line_item_discount = new \Square\Models\OrderLineItemDiscount();
+                    $order_line_item_discount = new \Square\Types\OrderLineItemDiscount();
                     $order_line_item_discount->setUid('discount');
                     $order_line_item_discount->setName('Discount');
                     $order_line_item_discount->setAmountMoney($discount_amount_money);
@@ -227,20 +238,17 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
                     $order->setDiscounts([$order_line_item_discount]);
                 }
 
-                $orderbody = new \Square\Models\CreateOrderRequest();
+                $orderbody = new \Square\Types\CreateOrderRequest();
                 $orderbody->setOrder($order);
                 $orderbody->setIdempotencyKey(uniqid());
-                $order_api_response = $client->getOrdersApi()->createOrder($orderbody);
 
-                if ($order_api_response->isSuccess()) {
-                    $result = $order_api_response->getResult();
-                    $order_id = $result->getOrder()->getId();
-                } else {
-                    $order_id = false;
-                    $errors = $order_api_response->getErrors();
+                try {
+                    $order_api_response = $client->orders->create($orderbody);
+                    $order_id           = $order_api_response->getOrder()->getId();
+                } catch (\Square\Exceptions\SquareApiException $e) {
                     $model['status'] = 'failed';
-                    $model['error'] = 'failed';
-                    foreach ($errors as $error) {
+                    $model['error']  = 'failed';
+                    foreach ($e->getErrors() as $error) {
                         $model['error'] = $error->getDetail();
                     }
                 }
@@ -257,18 +265,16 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
             $body->setReferenceId($model['reference_id'] ?? null);
             $body->setNote($model['description']);
 
-            $api_response = $client->getPaymentsApi()->createPayment($body);
-
-            if ($api_response->isSuccess()) {
-                $result = $api_response->getResult();
-                $model['status'] = 'success';
-                $model['transactionReference'] = $result->getPayment()->getId();
-                $model['result'] = $result->getPayment();
-            } else {
-                $errors = $api_response->getErrors();
+            try {
+                $api_response                  = $client->payments->create($body);
+                $resultPayment                 = $api_response->getPayment();
+                $model['status']               = 'success';
+                $model['transactionReference'] = $resultPayment->getId();
+                $model['result']               = $resultPayment;
+            } catch (\Square\Exceptions\SquareApiException $e) {
                 $model['status'] = 'failed';
-                $model['error'] = 'failed';
-                foreach ($errors as $error) {
+                $model['error']  = 'failed';
+                foreach ($e->getErrors() as $error) {
                     $model['error'] = $error->getDetail();
                 }
             }
@@ -278,7 +284,8 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface {
     /**
      * {@inheritDoc}
      */
-    public function supports($request) {
+    public function supports($request)
+    {
         return
             $request instanceof Capture &&
             $request->getModel() instanceof \ArrayAccess;

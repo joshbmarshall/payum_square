@@ -13,9 +13,9 @@ use Payum\Core\Reply\HttpResponse;
 use Payum\Core\Request\GetHttpRequest;
 use Payum\Core\Request\RenderTemplate;
 
-class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
+class ObtainNonceAction implements ActionInterface, GatewayAwareInterface
+{
     use GatewayAwareTrait;
-
 
     /**
      * @var string
@@ -27,16 +27,18 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
     /**
      * @param string $templateName
      */
-    public function __construct(string $templateName, bool $use_sandbox, bool $use_afterpay) {
+    public function __construct(string $templateName, bool $use_sandbox, bool $use_afterpay)
+    {
         $this->templateName = $templateName;
         $this->use_afterpay = $use_afterpay;
-        $this->use_sandbox = $use_sandbox;
+        $this->use_sandbox  = $use_sandbox;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function execute($request) {
+    public function execute($request)
+    {
         /** @var $request ObtainNonce */
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -51,40 +53,41 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
         $this->gateway->execute($getHttpRequest);
         // Received payment information from Square
         if (isset($getHttpRequest->request['payment_intent'])) {
-            $model['nonce'] = $getHttpRequest->request['payment_intent'];
+            $model['nonce']             = $getHttpRequest->request['payment_intent'];
             $model['verificationToken'] = $getHttpRequest->request['verification_token'];
+
             return;
         }
 
         $billingContact = [
             'email' => $model['email'] ?? '',
         ];
-        $this->gateway->execute($renderTemplate = new RenderTemplate($this->templateName, array(
-            'merchant_reference' => $model['merchant_reference'] ?? '',
-            'amount' => $model['currencySymbol'] . ' ' . number_format($model['amount'], $model['currencyDigits']),
+        $this->gateway->execute($renderTemplate = new RenderTemplate($this->templateName, [
+            'merchant_reference'  => $model['merchant_reference'] ?? '',
+            'amount'              => $model['currencySymbol'] . ' ' . number_format($model['amount'], $model['currencyDigits']),
             'verificationDetails' => json_encode([
-                'amount' => number_format($model['amount'], 2, '.', ''),
+                'amount'         => number_format($model['amount'], 2, '.', ''),
                 'billingContact' => $billingContact,
-                'currencyCode' => $model['currency'],
-                'intent' => 'CHARGE',
+                'currencyCode'   => $model['currency'],
+                'intent'         => 'CHARGE',
             ]),
-            'numeric_amount' => $model['amount'],
-            'currencyCode' => $model['currency'],
-            'appId' => $model['app_id'],
-            'locationId' => $model['location_id'],
-            'actionUrl' => $getHttpRequest->uri,
-            'imgUrl' => $model['img_url'],
-            'use_afterpay' => $this->use_afterpay ? 1 : 0,
-            'billing' => $model['billing'] ?? [],
-            'shipping' => $model['shipping'] ?? [],
-            'country' => $model['country'] ?? 'AU',
-            'use_sandbox' => $this->use_sandbox ? 1 : 0,
-            'ship_item' => $model['ship_item'] ?? false,
-            'pickupContact' => json_encode($model['pickup_contact'] ?? null),
-            'afterpay_addresschange_url' => $model['afterpay_addresschange_url'] ?? false,
+            'numeric_amount'              => $model['amount'],
+            'currencyCode'                => $model['currency'],
+            'appId'                       => $model['app_id'],
+            'locationId'                  => $model['location_id'],
+            'actionUrl'                   => $getHttpRequest->uri,
+            'imgUrl'                      => $model['img_url'],
+            'use_afterpay'                => $this->use_afterpay ? 1 : 0,
+            'billing'                     => $model['billing']   ?? [],
+            'shipping'                    => $model['shipping'] ?? [],
+            'country'                     => $model['country']   ?? 'AU',
+            'use_sandbox'                 => $this->use_sandbox ? 1 : 0,
+            'ship_item'                   => $model['ship_item'] ?? false,
+            'pickupContact'               => json_encode($model['pickup_contact'] ?? null),
+            'afterpay_addresschange_url'  => $model['afterpay_addresschange_url']   ?? false,
             'afterpay_shippingchange_url' => $model['afterpay_shippingchange_url'] ?? false,
-            'afterpay_shipping_options' => json_encode($model['afterpay_shipping_options'] ?? []),
-        )));
+            'afterpay_shipping_options'   => json_encode($model['afterpay_shipping_options'] ?? []),
+        ]));
 
         throw new HttpResponse($renderTemplate->getResult());
     }
@@ -92,7 +95,8 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface {
     /**
      * {@inheritDoc}
      */
-    public function supports($request) {
+    public function supports($request)
+    {
         return
             $request instanceof ObtainNonce &&
             $request->getModel() instanceof \ArrayAccess;
