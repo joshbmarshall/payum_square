@@ -11,7 +11,8 @@ use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
 use Payum\Core\Request\GetCurrency;
 
-class ConvertPaymentAction implements ActionInterface, GatewayAwareInterface {
+class ConvertPaymentAction implements ActionInterface, GatewayAwareInterface
+{
     use GatewayAwareTrait;
 
     /**
@@ -19,7 +20,8 @@ class ConvertPaymentAction implements ActionInterface, GatewayAwareInterface {
      *
      * @param Convert $request
      */
-    public function execute($request) {
+    public function execute($request)
+    {
         RequestNotSupportedException::assertSupports($this, $request);
 
         /** @var PaymentInterface $payment */
@@ -27,12 +29,12 @@ class ConvertPaymentAction implements ActionInterface, GatewayAwareInterface {
 
         $details = ArrayObject::ensureArrayObject($payment->getDetails());
         $this->gateway->execute($currency = new GetCurrency($payment->getCurrencyCode()));
-        $divisor = pow(10, $currency->exp);
-        $details["amount"] = $payment->getTotalAmount() / $divisor;
-        $details["currency"] = $payment->getCurrencyCode();
-        $details["currencySymbol"] = $currency->alpha3;
-        $details["currencyDigits"] = $currency->exp;
-        $details["description"] = $payment->getDescription();
+        $divisor                   = pow(10, $currency->exp);
+        $details['amount']         = $payment->getTotalAmount() / $divisor;
+        $details['currency']       = $payment->getCurrencyCode();
+        $details['currencySymbol'] = $currency->alpha3;
+        $details['currencyDigits'] = $currency->exp;
+        $details['description']    = $payment->getDescription();
 
         $request->setResult((array) $details);
     }
@@ -40,7 +42,8 @@ class ConvertPaymentAction implements ActionInterface, GatewayAwareInterface {
     /**
      * {@inheritDoc}
      */
-    public function supports($request) {
+    public function supports($request)
+    {
         return
             $request instanceof Convert &&
             $request->getSource() instanceof PaymentInterface &&
