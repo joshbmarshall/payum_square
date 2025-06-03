@@ -26,7 +26,6 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
 
     public function getSquareCustomer(\Square\SquareClient $client, array $data): string
     {
-        throw new \Exception('TODO'); // TODO
         // Search for customer
         $email = new \Square\Types\CustomerTextFilter();
         $email->setExact($data['email']);
@@ -210,7 +209,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                     ]);
                     $order_line_item->setCatalogObjectId($this->getSquareCatalogueObject($client, $line_item['name']));
 
-                    $line_amount_money = new \Square\Models\Money();
+                    $line_amount_money = new \Square\Types\Money();
                     $line_amount_money->setAmount(round($line_item['amount'] * 100));
                     $line_amount_money->setCurrency($model['currency']);
                     $order_line_item->setBasePriceMoney($line_amount_money);
@@ -221,9 +220,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                     $order_line_items[] = $order_line_item;
                 }
                 $order->setLineItems($order_line_items);
-                ray(get_defined_vars());
 
-                throw new \Exception('TODO'); // TODO
                 if (isset($model['customer'])) {
                     $order->setCustomerId($this->getSquareCustomer($client, $model['customer']));
                 }
@@ -241,20 +238,17 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                     $order->setDiscounts([$order_line_item_discount]);
                 }
 
-                $orderbody = new \Square\Models\CreateOrderRequest();
+                $orderbody = new \Square\Types\CreateOrderRequest();
                 $orderbody->setOrder($order);
                 $orderbody->setIdempotencyKey(uniqid());
-                $order_api_response = $client->getOrdersApi()->createOrder($orderbody);
 
-                if ($order_api_response->isSuccess()) {
-                    $result   = $order_api_response->getResult();
-                    $order_id = $result->getOrder()->getId();
-                } else {
-                    $order_id        = false;
-                    $errors          = $order_api_response->getErrors();
+                try {
+                    $order_api_response = $client->orders->create($orderbody);
+                    $order_id           = $order_api_response->getOrder()->getId();
+                } catch (\Square\Exceptions\SquareApiException $e) {
                     $model['status'] = 'failed';
                     $model['error']  = 'failed';
-                    foreach ($errors as $error) {
+                    foreach ($e->getErrors() as $error) {
                         $model['error'] = $error->getDetail();
                     }
                 }
