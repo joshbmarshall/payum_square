@@ -51,8 +51,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
         }
 
         // Create the customer
-
-        $body = new \Square\Types\CreateCustomerRequest();
+        $body = new \Square\Customers\Requests\CreateCustomerRequest();
         if (isset($data['given_name'])) {
             $body->setGivenName($data['given_name']);
         }
@@ -72,17 +71,17 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
             $body->setNote($data['note']);
         }
 
-        $api_response = $client->getCustomersApi()->createCustomer($body);
-
-        if ($api_response->isSuccess()) {
-            $result = $api_response->getResult();
-        } else {
-            foreach ($api_response->getErrors() as $error) {
-                throw new \Exception($error->getDetail());
+        try {
+            return $client->customers->create($body)->getCustomer()->getId();
+        } catch (\Square\Exceptions\SquareApiException $e) {
+            $model['status'] = 'failed';
+            $model['error']  = 'failed';
+            foreach ($e->getErrors() as $error) {
+                $model['error'] = $error->getDetail();
             }
         }
 
-        return $result->getCustomer()->getId();
+        return '';
     }
 
     public function getSquareCatalogueObject(\Square\SquareClient $client, string $name): string
@@ -139,6 +138,8 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
         foreach ($item->getCatalogObject()->asItem()->getItemData()->getVariations() as $variation) {
             return $variation->getValue()->getId();
         }
+
+        return '';
     }
 
     /**
