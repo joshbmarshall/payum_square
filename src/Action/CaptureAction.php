@@ -227,11 +227,10 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                 }
 
                 if ($order_discount) {
-                    throw new \Exception('TODO'); // TODO
-                    $discount_amount_money = new \Square\Models\Money();
+                    $discount_amount_money = new \Square\Types\Money();
                     $discount_amount_money->setAmount(round($order_discount * 100));
                     $discount_amount_money->setCurrency($model['currency']);
-                    $order_line_item_discount = new \Square\Models\OrderLineItemDiscount();
+                    $order_line_item_discount = new \Square\Types\OrderLineItemDiscount();
                     $order_line_item_discount->setUid('discount');
                     $order_line_item_discount->setName('Discount');
                     $order_line_item_discount->setAmountMoney($discount_amount_money);
