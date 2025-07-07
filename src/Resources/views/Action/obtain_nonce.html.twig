@@ -12,8 +12,10 @@
     {% if imgUrl %}
 			<img style="max-width: 100%; height: auto;" src="{{ imgUrl }}" />
     {% endif %}
-      <div id="afterpay-button"></div>
-      <div id="card-container"></div>
+      <div id="apple-pay-button" style="margin-top: 10px;"></div>
+      <div id="google-pay-button" style="margin-top: 10px;"></div>
+      <div id="afterpay-button" style="margin-top: 10px;"></div>
+      <div id="card-container" style="margin-top: 10px;"></div>
       <button id="card-button" type="button" style="visibility: hidden;">Pay {{ amount }}</button>
       <center style="margin-top: 10px;">
       <small>
@@ -138,6 +140,21 @@
         return req;
       }
 
+      async function initializeApplePay(payments) {
+        const paymentRequest = buildPaymentRequest(payments)
+        const applePay = await payments.applePay(paymentRequest);
+        return applePay;
+      }
+
+      async function initializeGooglePay(payments) {
+        const paymentRequest = buildPaymentRequest(payments)
+
+        const googlePay = await payments.googlePay(paymentRequest);
+        await googlePay.attach('#google-pay-button');
+
+        return googlePay;
+      }
+
       async function initializeAfterpay(payments) {
         const paymentRequest = buildPaymentRequest(payments)
 
@@ -180,6 +197,20 @@
           return;
         }
 
+        let applePay;
+        try {
+          applePay = await initializeApplePay(payments);
+        } catch (e) {
+          console.error('Initializing Apple Pay failed', e);
+        }
+
+        let googlePay;
+        try {
+          googlePay = await initializeGooglePay(payments);
+        } catch (e) {
+          console.error('Initializing Google Pay failed', e);
+        }
+
         let afterpay;
         try {
 {% if use_afterpay %}
@@ -211,6 +242,20 @@
 
         // Checkpoint 2.
 
+        if (applePay !== undefined) {
+          const applePayButton = document.getElementById('apple-pay-button');
+          applePayButton.addEventListener('click', async function (event) {
+            await handlePaymentMethodSubmission(event, applePay);
+          });
+        }
+
+        if (googlePay !== undefined) {
+          const googlePayButton = document.getElementById('google-pay-button');
+          googlePayButton.addEventListener('click', async function (event) {
+            await handlePaymentMethodSubmission(event, googlePay);
+          });
+        }
+
         if (afterpay !== undefined) {
           const afterpayButton = document.getElementById('afterpay-button');
           afterpayButton.addEventListener('click', async function (event) {
@@ -224,7 +269,7 @@
           // disable the submit button as we await tokenization and make a payment request.
           cardButton.disabled = true;
           const token = await tokenize(paymentMethod);
-          let verificationToken;
+          let verificationToken = '';
 
           if (shouldVerify) {
             verificationToken = await verifyBuyer(
