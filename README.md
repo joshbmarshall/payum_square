@@ -197,6 +197,30 @@ if ($status->isNew() || $status->isCaptured() || $status->isAuthorized()) {
 }
 ```
 
+### Getting the Access Tokens
+
+Create a new app in the Square developer tools to get tokens for the above code.
+
+To do this, go to https://developer.squareup.com/console/en/apps and create a new app.
+
+Name the app, and skip the rest of the questions.
+
+It will give you the Application ID and Access Token. Make sure you have it in "Production" mode so you get live payment tokens.
+
+Click on "Locations" in the menu, and it will show you the Location ID.
+
+### Configure Apple Pay
+
+Apple Pay requires a file to be uploaded to the server to validate the domain.
+
+To configure this, choose Apple Pay then Web from the menu.
+
+Click Add Domain, and in the popup type the domain you're using when taking payments. Omit any https:// at the beginning.
+
+Download the verification file that is shown on the next screen, and upload it to the location they display.
+
+Once uploaded (test the link yourself) click the "Verify" button and it completes the process.
+
 ## License
 
 Payum Square is released under the [MIT License](LICENSE).
