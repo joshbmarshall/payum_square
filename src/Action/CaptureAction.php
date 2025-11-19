@@ -2,23 +2,19 @@
 
 namespace Cognito\PayumSquare\Action;
 
+use Cognito\PayumSquare\Request\Api\ObtainNonce;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Capture;
-use Cognito\PayumSquare\Request\Api\ObtainNonce;
 
 class CaptureAction implements ActionInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
-
     private $config;
 
-    /**
-     * @param string $templateName
-     */
     public function __construct(ArrayObject $config)
     {
         $this->config = $config;
@@ -43,6 +39,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
 
         if ($api_response->getCustomers()) {
             $customers = $api_response->getCustomers();
+
             if ($customers) {
                 foreach ($customers as $customer) {
                     return $customer->getId();
@@ -52,21 +49,27 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
 
         // Create the customer
         $body = new \Square\Customers\Requests\CreateCustomerRequest();
+
         if (isset($data['given_name'])) {
             $body->setGivenName($data['given_name']);
         }
+
         if (isset($data['family_name'])) {
             $body->setFamilyName($data['family_name']);
         }
+
         if (isset($data['email'])) {
             $body->setEmailAddress($data['email']);
         }
+
         if (isset($data['phone'])) {
             $body->setPhoneNumber($data['phone']);
         }
+
         if (isset($data['id'])) {
             $body->setReferenceId($data['id']);
         }
+
         if (isset($data['note'])) {
             $body->setNote($data['note']);
         }
@@ -76,6 +79,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
         } catch (\Square\Exceptions\SquareApiException $e) {
             $model['status'] = 'failed';
             $model['error']  = 'failed';
+
             foreach ($e->getErrors() as $error) {
                 $model['error'] = $error->getDetail();
             }
@@ -103,6 +107,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
         );
 
         $objects = $result->getObjects();
+
         if ($objects) {
             foreach ($objects as $object) {
                 foreach ($object->asItem()->getItemData()->getVariations() as $variation) {
@@ -143,7 +148,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      *
      * @param Capture $request
      */
@@ -152,6 +157,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
+
         if ($model['status']) {
             return;
         }
@@ -164,8 +170,9 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
         $obtainNonce->setModel($model);
 
         $this->gateway->execute($obtainNonce);
+
         if (!$model->offsetExists('status')) {
-            $model['status']               = 'success';
+            $model['status']               = 'failed';
             $model['transactionReference'] = 'test';
             $model['result']               = 'result';
 
@@ -204,6 +211,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                     'locationId' => $model['location_id'],
                 ]);
                 $order_line_items = [];
+
                 foreach ($line_items as $line_item) {
                     $order_line_item = new \Square\Types\OrderLineItem([
                         'quantity' => $line_item['qty'],
@@ -214,6 +222,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                     $line_amount_money->setAmount(round($line_item['amount'] * 100));
                     $line_amount_money->setCurrency($model['currency']);
                     $order_line_item->setBasePriceMoney($line_amount_money);
+
                     if ($line_item['note'] ?? '') {
                         $order_line_item->setNote($line_item['note']);
                     }
@@ -248,6 +257,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
                 } catch (\Square\Exceptions\SquareApiException $e) {
                     $model['status'] = 'failed';
                     $model['error']  = 'failed';
+
                     foreach ($e->getErrors() as $error) {
                         $model['error'] = $error->getDetail();
                     }
@@ -274,6 +284,7 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
             } catch (\Square\Exceptions\SquareApiException $e) {
                 $model['status'] = 'failed';
                 $model['error']  = 'failed';
+
                 foreach ($e->getErrors() as $error) {
                     $model['error'] = $error->getDetail();
                 }
@@ -282,12 +293,12 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function supports($request)
     {
         return
-            $request instanceof Capture &&
-            $request->getModel() instanceof \ArrayAccess;
+            $request instanceof Capture
+            && $request->getModel() instanceof \ArrayAccess;
     }
 }
