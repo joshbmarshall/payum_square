@@ -24,9 +24,6 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface
     protected $use_afterpay;
     protected $use_sandbox;
 
-    /**
-     * @param string $templateName
-     */
     public function __construct(string $templateName, bool $use_sandbox, bool $use_afterpay)
     {
         $this->templateName = $templateName;
@@ -35,11 +32,11 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function execute($request)
     {
-        /** @var $request ObtainNonce */
+        /** @var ObtainNonce $request */
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
@@ -51,6 +48,7 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface
 
         $getHttpRequest = new GetHttpRequest();
         $this->gateway->execute($getHttpRequest);
+
         // Received payment information from Square
         if (isset($getHttpRequest->request['payment_intent'])) {
             $model['nonce']             = $getHttpRequest->request['payment_intent'];
@@ -78,13 +76,13 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface
             'actionUrl'                   => $getHttpRequest->uri,
             'imgUrl'                      => $model['img_url'],
             'use_afterpay'                => $this->use_afterpay ? 1 : 0,
-            'billing'                     => $model['billing']   ?? [],
+            'billing'                     => $model['billing']  ?? [],
             'shipping'                    => $model['shipping'] ?? [],
-            'country'                     => $model['country']   ?? 'AU',
+            'country'                     => $model['country']  ?? 'AU',
             'use_sandbox'                 => $this->use_sandbox ? 1 : 0,
             'ship_item'                   => $model['ship_item'] ?? false,
             'pickupContact'               => json_encode($model['pickup_contact'] ?? null),
-            'afterpay_addresschange_url'  => $model['afterpay_addresschange_url']   ?? false,
+            'afterpay_addresschange_url'  => $model['afterpay_addresschange_url']  ?? false,
             'afterpay_shippingchange_url' => $model['afterpay_shippingchange_url'] ?? false,
             'afterpay_shipping_options'   => json_encode($model['afterpay_shipping_options'] ?? []),
         ]));
@@ -93,12 +91,12 @@ class ObtainNonceAction implements ActionInterface, GatewayAwareInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function supports($request)
     {
         return
-            $request instanceof ObtainNonce &&
-            $request->getModel() instanceof \ArrayAccess;
+            $request instanceof ObtainNonce
+            && $request->getModel() instanceof \ArrayAccess;
     }
 }
