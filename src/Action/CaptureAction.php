@@ -187,11 +187,16 @@ class CaptureAction implements ActionInterface, GatewayAwareInterface
             $amount_money->setAmount(round($model['amount'] * 100));
             $amount_money->setCurrency($model['currency']);
 
+            $app_fee_money = new \Square\Types\Money();
+            $app_fee_money->setAmount(round(($model['app_fee'] ?? 0) * 100));
+            $app_fee_money->setCurrency($model['currency']);
+
             $body = new \Square\Payments\Requests\CreatePaymentRequest([
                 'sourceId'       => $model['nonce'],
                 'idempotencyKey' => $request->getToken()->getHash(),
+                'amountMoney'    => $amount_money,
+                'appFeeMoney'    => $app_fee_money,
             ]);
-            $body->setAmountMoney($amount_money);
 
             $item_name      = $model['square_item_name']  ?? false;
             $line_items     = $model['square_line_items'] ?? [];
